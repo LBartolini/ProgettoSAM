@@ -1,5 +1,9 @@
 from vuln_scraper.shodan import Shodan
 from vuln_scraper.sploitus import Sploitus
+from csv_builder.builder import Builder
+from github_scraper.dependency_file import PackageJson
+from github_scraper.github import Github
+import os
 
 if __name__ == "__main__":
     # Test
@@ -14,10 +18,18 @@ if __name__ == "__main__":
     """
     
     # search given a vuln
+    """
     shodan_results = shodan.shodan_engine("xz","5.1.0")
     
     if shodan_results is not None:
         for result in shodan_results: # result is in the format product:version:cve of vulnerables found
             cve = result.split(":")[-1] # get cve only
             print(sploitus.search_sploitus_by_cve(cve=cve))
+    """
     
+    if (token := os.environ.get("GITHUB_ACCESS_TOKEN")) is None:
+        exit("Please set environment variable GITHUB_ACCESS_TOKEN")
+    
+    b = Builder({"js": [PackageJson()]}, Github(token))
+    
+    b.build_all_csv(verbose=True)
