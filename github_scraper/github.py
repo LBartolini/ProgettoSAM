@@ -11,10 +11,10 @@ class Github:
 
     def call_repository_api(self, 
                 language: str, 
-                 min_stars: int = 20, 
-                 last_commit_pushed_after: str = "2025-08-18",
-                 per_page: int = 100,
-                 page: int = 1) -> dict:
+                min_stars: int = 20, 
+                last_commit_pushed_after: str = "2025-08-18",
+                per_page: int = 100,
+                page: int = 1) -> dict:
         
         headers = {"Authorization": f"Bearer {self.github_access_token}"}
 
@@ -26,7 +26,7 @@ class Github:
                                   page=page),
                         headers=headers)).json()
         
-        return response  
+        return response
     
     def call_code_api(self, 
                 repo: str, 

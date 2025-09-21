@@ -11,6 +11,16 @@ class DependencyFile(ABC):
     def extract_dependencies(self, content: str) -> set:
         pass
     
+    @property
+    @abstractmethod
+    def filename(self):
+        pass
+    
+    @property
+    @abstractmethod
+    def extension(self):
+        pass
+    
     def get_github_download_url(self, url: str):
         return r.get(url=url).json()['download_url']
 
@@ -42,7 +52,7 @@ class PackageJson(DependencyFile):
         
 # Tests from command line, not the purpose of this script
 if __name__=="__main__":
-    p = PackageJson()
+    p: DependencyFile = PackageJson()
     
     #print(p.download_file("https://api.github.com/repositories/10270250/contents/package.json?ref=6eda534718d09a26d58d65c0a376e05d7e2a3358"))
     
