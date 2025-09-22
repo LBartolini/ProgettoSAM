@@ -69,8 +69,14 @@ class Github:
         while contents:
             file_content = contents.pop(0)
             if file_content["type"] == "dir":
-                contents.extend((r.get(url=self.contents_url.format(repo_full_name=repo_full_name, path=urllib.parse.quote(file_content["path"])),
-                            headers=headers)).json())
+                rr = (r.get(url=self.contents_url.format(repo_full_name=repo_full_name, path=urllib.parse.quote(file_content["path"])),headers=headers)).json()
+                            
+                while self.__check_blocked(rr):
+                    print(f"Github API Rate limit reached, sleeping for {self.blocked_sleep/60} minutes... ")
+                    sleep(self.blocked_sleep)
+                    rr = (r.get(url=self.contents_url.format(repo_full_name=repo_full_name, path=urllib.parse.quote(file_content["path"])),headers=headers)).json()
+                
+                contents.extend(rr)
             else:
                 if file_content["name"] in files_to_search:
                     raw_download_urls[file_content["name"]].append(file_content["download_url"])
