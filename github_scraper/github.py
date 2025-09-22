@@ -4,11 +4,19 @@ import requests as r
 import os
 import urllib
 
+from time import sleep
+
 class Github:
     def __init__(self, github_access_token: str):
         self.github_access_token = github_access_token
         self.repository_url = "https://api.github.com/search/repositories?q=language:{language}+size:<{size_up_limit}+stars:{stars}+archived:=false+pushed:{last_commit_pushed_after}..{today}&per_page={per_page}&page={page}"
         self.contents_url = "https://api.github.com/repos/{repo_full_name}/contents/{path}"
+        self.blocked = "API rate limit exceeded for user ID"
+        self.blocked_sleep = 120
+
+    def __check_blocked(self, jsoned):
+        return 'message' in jsoned and self.blocked in jsoned['message']
+        
 
     def call_repository_api(self, 
                 language: str, 
@@ -28,6 +36,10 @@ class Github:
                                   per_page=per_page,
                                   page=page),
                         headers=headers)).json()
+             
+        while self.__check_blocked(response):
+            print(f"Github API Rate limit reached, sleeping for {self.blocked_sleep/60} minutes... ")
+            sleep(self.blocked_sleep)
         
         return response
     
@@ -39,6 +51,10 @@ class Github:
         headers = {"Authorization": f"Bearer {self.github_access_token}"}
         contents = (r.get(url=self.contents_url.format(repo_full_name=repo_full_name, path=""),
                         headers=headers)).json()
+        
+        while self.__check_blocked(contents):
+            print(f"Github API Rate limit reached, sleeping for {self.blocked_sleep/60} minutes... ")
+            sleep(self.blocked_sleep)
         
         while contents:
             file_content = contents.pop(0)

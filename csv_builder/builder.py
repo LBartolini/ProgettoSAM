@@ -19,7 +19,7 @@ class Builder:
     def __init__(self, 
                  language_dict: Mapping[str, Mapping[str, DependencyFile]],
                  github: Github,
-                 star_ranges: List[str] = [">1800", "50..65", "150..240"], #["19..22", "50..65", "150..240", "450..999", ">1800"],
+                 star_ranges: List[str] = [">1800"], #["19..22", "50..65", "150..240", "450..999", ">1800"],
                  output_folder: str = "./output"):
         self.language_dict = language_dict
         self.github = github
@@ -181,14 +181,16 @@ class Builder:
                                     if verbose: print("Waiting for threads...")
                                     sleep(3)
                                     
+                                thread = threading.Thread(target=self.parse_vuln_and_save, args=(repo,star_range,file_searched,dependency_set.copy()), daemon=True)
+                                with self.mutex:
+                                    self.threads_number+=1
+                                thread.start()
+                                
                         except Exception as ex:
                             print("Exception occurred " + str(ex))
                             continue
                         
-                        thread = threading.Thread(target=self.parse_vuln_and_save, args=(repo,star_range,file_searched,dependency_set.copy()), daemon=True)
-                        with self.mutex:
-                            self.threads_number+=1
-                        thread.start()
+
                         
                         
 
