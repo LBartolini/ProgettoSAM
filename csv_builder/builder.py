@@ -89,35 +89,38 @@ class Builder:
 
             except ValueError:
                 pass
+            
+        try:
+            for cve in cve_strings:
+                if cve.startswith("CVE"):  # let's consider cve only
+                    _, ll = self.sploitus.search_sploitus_by_cve(cve=cve)
+                    sploitus_pocs = sploitus_pocs + ll
 
-        for cve in cve_strings:
-            if cve.startswith("CVE"):  # let's consider cve only
-                _, ll = self.sploitus.search_sploitus_by_cve(cve=cve)
-                sploitus_pocs = sploitus_pocs + ll
+            # export in csv
+            csv_output = {
+                "repository": repo['full_name'],
+                "star_range": star_range,
+                "star": repo['stargazers_count'],
+                "latest_push": repo['updated_at'],
+                "files": file_searched,
+                "total_dependencies": len(dependency_set),
+                "number_of_vulnerabilities": max(len(cve_strings), len(ghsa), 0),
+                "ghsa": ghsa,
+                "cve_strings": cve_strings,
+                "cvss": cvss,
+                "severity": severity,
+                "sploitus_number_of_pocs": sploitus_pocs,
+            }
 
-        # export in csv
-        csv_output = {
-            "repository": repo['full_name'],
-            "star_range": star_range,
-            "star": repo['stargazers_count'],
-            "latest_push": repo['updated_at'],
-            "files": file_searched,
-            "total_dependencies": len(dependency_set),
-            "number_of_vulnerabilities": max(len(cve_strings), len(ghsa), 0),
-            "ghsa": ghsa,
-            "cve_strings": cve_strings,
-            "cvss": cvss,
-            "severity": severity,
-            "sploitus_number_of_pocs": sploitus_pocs,
-        }
+            # Flatten the dictionary
+            flat_output = self.flatten_dict(csv_output)
 
-        # Flatten the dictionary
-        flat_output = self.flatten_dict(csv_output)
-
-        # Write to CSV
-        with open(os.path.join(self.output_folder, star_range + ".csv"), "a", newline="", encoding="utf-8") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=flat_output.keys())
-            writer.writerow(flat_output)
+            # Write to CSV
+            with open(os.path.join(self.output_folder, star_range + ".csv"), "a", newline="", encoding="utf-8") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=flat_output.keys())
+                writer.writerow(flat_output)
+        except Exception:
+            pass
             
         with self.mutex:
             self.threads_number-=1
@@ -179,12 +182,13 @@ class Builder:
                                     sleep(3)
                                 
                                 thread = threading.Thread(target=self.parse_vuln_and_save, args=(repo,star_range,file_searched,dependency_set.copy()), daemon=True)
-                                with self.mutex:
-                                    self.threads_number+=1
-                                thread.start()
                         except Exception as ex:
                             print("Exception occurred " + str(ex))
-                            pass
+                            continue
+                        
+                        with self.mutex:
+                            self.threads_number+=1
+                        thread.start()
 
 
                                 
