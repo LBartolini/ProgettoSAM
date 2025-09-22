@@ -2,6 +2,7 @@ import requests as r
 import urllib
 import re
 import sys
+from typing import Mapping
 
 class Shodan:
     def __init__(self):
@@ -23,7 +24,7 @@ class Shodan:
         scope, name = match.groups()
         return scope if scope else name
 
-    def shodan_engine(self, product: str, version:str) -> list:
+    def shodan_engine(self, product: str, version:str) -> Mapping[str,dict]|None:
 
         if re.match(self.__product_regex, product) is None:
             raise ValueError(self.__product_error)

@@ -1,8 +1,14 @@
 from typing import Mapping, List
+
 from github_scraper.dependency_file import DependencyFile
 from github_scraper.github import Github
+
+from vuln_scraper.shodan import Shodan
+from vuln_scraper.sploitus import Sploitus
+from vuln_scraper.deps_dev import DepsDev
+from vuln_scraper.osv_dev import OSDev
+
 import math
-from time import sleep
 
 class Builder:
     def __init__(self, 
@@ -14,6 +20,11 @@ class Builder:
         self.github = github
         self.output_folder = output_folder
         self.star_ranges = star_ranges
+        self.shodan = Shodan()
+        self.sploitus = Sploitus()
+        self.deps_dev = DepsDev()
+        self.os_dev = OSDev()
+        
         
     def build_all_csv(self, results_per_page:int=100, verbose:bool=False):
         if verbose: print("Starting CSV build loop")
@@ -46,5 +57,49 @@ class Builder:
                                 content = self.language_dict[language][file_searched].download_file(url_to_download)
                                 dependency_set.update(self.language_dict[language][file_searched].extract_dependencies(content))
                                 
-                            print(dependency_set)
+                            os_dev_vulns = []
+                            shodan_results = []
+                            sploitus_results = []
+                            deps_result = []
                             
+                            for el in dependency_set:
+                                product = el[0]
+                                version = el[1]
+                                
+                                deps_response = self.deps_dev.depsdev_engine(product=product, version=version)
+                                
+                                if 'advisoryKeys' in deps_response and len(deps_response['advisoryKeys']) > 0:
+                                    deps_result = deps_response['advisoryKeys']
+                                
+                                os_dev_engine_response = self.os_dev.osdev_engine(product=product, version=version)
+                                
+                                if len(os_dev_engine_response) > 0:
+                                    for vuln in os_dev_engine_response['vulns']:
+                                        os_dev_vulns.append({'id':vuln['id'], 'refs':vuln['references'], "score": vuln['severity'][0]['score']})
+                                                                
+                                s_r = self.shodan.shodan_engine(product=product,version=version)
+    
+                                if s_r is not None:
+                                    shodan_results.append(s_r)
+                                    for result in s_r: # result is in the format product:version:cve of vulnerables found
+                                        cve = result.split(":")[-1] # get cve only
+                                        sploitus , ll = self.sploitus.search_sploitus_by_cve(cve=cve)
+                                        if ll > 0:
+                                            sploitus_results.append(sploitus)
+                                        
+                            # export in csv
+                            csv_output = {
+                                          "repository" : repo['full_name'], 
+                                          "star_range": star_range,
+                                          "latest_push": repo['updated_at'],
+                                          "files": files_found, 
+                                          "total_dependencies": dependency_set,
+                                          "number of vulnerabilities": (a if (a := max([deps_result, os_dev_vulns, shodan_results], key=len)) else 0),
+                                          "deps_result": deps_result,
+                                          "os_dev_vulns": os_dev_vulns,
+                                          "shodan_result": shodan_results,
+                                          "sploitus_result": sploitus_results,
+                            }
+                            
+                            
+                            print(csv_output)

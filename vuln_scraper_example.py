@@ -17,16 +17,6 @@ if __name__ == "__main__":
         SPLOITUS -> returns a json in the first argument and the second argument represents the number of findings
     """
     
-    # search given a vuln
-    """
-    shodan_results = shodan.shodan_engine("xz","5.1.0")
-    
-    if shodan_results is not None:
-        for result in shodan_results: # result is in the format product:version:cve of vulnerables found
-            cve = result.split(":")[-1] # get cve only
-            print(sploitus.search_sploitus_by_cve(cve=cve))
-    """
-    
     if (token := os.environ.get("GITHUB_ACCESS_TOKEN")) is None:
         exit("Please set environment variable GITHUB_ACCESS_TOKEN")
     
