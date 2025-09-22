@@ -157,30 +157,34 @@ class Builder:
                     if verbose: print(f"Now GITHUB_REPO_INDEX={github_repo_index}")
                     repositories = self.github.call_repository_api(language=language, stars=star_range, page=github_repo_index)['items']
                     
-                    for repo in repositories:
-                        if verbose: print(f"Repo {repo['full_name']}")
-                        
-                        files_to_search = [v.filename for v in self.language_dict[language].values()]
-                        
-                        files_found = self.github.get_files_from_repo(repo['full_name'], files_to_search=files_to_search)
-                        
-                        for file_searched in files_found.keys():
-                            dependency_set = set()
+                    for repo in repositories:                   
+                        try:
+                            if verbose: print(f"Repo {repo['full_name']}")
                             
-                            for url_to_download in files_found[file_searched]:
-                                content = self.language_dict[language][file_searched].download_file(url_to_download)
-                                dependency_set.update(self.language_dict[language][file_searched].extract_dependencies(content))
+                            files_to_search = [v.filename for v in self.language_dict[language].values()]
+                            
+                            files_found = self.github.get_files_from_repo(repo['full_name'], files_to_search=files_to_search)
+                            
+                            for file_searched in files_found.keys():
+                                dependency_set = set()
                                 
-                            if verbose: print("Analyzing dependencies... ")
-                            
-                            while self.threads_number >= 10:
-                                if verbose: print("Waiting for threads...")
-                                sleep(3)
-                            
-                            thread = threading.Thread(target=self.parse_vuln_and_save, args=(repo,star_range,file_searched,dependency_set.copy()), daemon=True)
-                            with self.mutex:
-                                self.threads_number+=1
-                            thread.start()
+                                for url_to_download in files_found[file_searched]:
+                                    content = self.language_dict[language][file_searched].download_file(url_to_download)
+                                    dependency_set.update(self.language_dict[language][file_searched].extract_dependencies(content))
+                                    
+                                if verbose: print("Analyzing dependencies... ")
+                                
+                                while self.threads_number >= 10:
+                                    if verbose: print("Waiting for threads...")
+                                    sleep(3)
+                                
+                                thread = threading.Thread(target=self.parse_vuln_and_save, args=(repo,star_range,file_searched,dependency_set.copy()), daemon=True)
+                                with self.mutex:
+                                    self.threads_number+=1
+                                thread.start()
+                        except Exception as ex:
+                            print("Exception occurred " + str(ex))
+                            pass
 
 
                                 
