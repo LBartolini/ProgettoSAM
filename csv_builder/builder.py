@@ -87,7 +87,7 @@ class Builder:
                         cve_strings.add(result['cve_id'])
                         cvss.append(result['cvss'])
 
-            except ValueError:
+            except Exception:
                 pass
             
         try:
