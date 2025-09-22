@@ -40,6 +40,14 @@ class Github:
         while self.__check_blocked(response):
             print(f"Github API Rate limit reached, sleeping for {self.blocked_sleep/60} minutes... ")
             sleep(self.blocked_sleep)
+            response = (r.get(url=self.repository_url.format(language=language, 
+                          size_up_limit=size_up_limit,
+                          stars=stars, 
+                          last_commit_pushed_after=last_commit_pushed_after,
+                          today=datetime.today().strftime('%Y-%m-%d'),
+                          per_page=per_page,
+                          page=page),
+                headers=headers)).json()
         
         return response
     
@@ -55,6 +63,8 @@ class Github:
         while self.__check_blocked(contents):
             print(f"Github API Rate limit reached, sleeping for {self.blocked_sleep/60} minutes... ")
             sleep(self.blocked_sleep)
+            contents = (r.get(url=self.contents_url.format(repo_full_name=repo_full_name, path=""),
+                headers=headers)).json()
         
         while contents:
             file_content = contents.pop(0)
