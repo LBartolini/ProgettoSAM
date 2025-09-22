@@ -7,11 +7,12 @@ import urllib
 class Github:
     def __init__(self, github_access_token: str):
         self.github_access_token = github_access_token
-        self.repository_url = "https://api.github.com/search/repositories?q=language:{language}+stars:{stars}+archived:=false+pushed:{last_commit_pushed_after}..{today}&per_page={per_page}&page={page}"
+        self.repository_url = "https://api.github.com/search/repositories?q=language:{language}+size:<{size_up_limit}+stars:{stars}+archived:=false+pushed:{last_commit_pushed_after}..{today}&per_page={per_page}&page={page}"
         self.contents_url = "https://api.github.com/repos/{repo_full_name}/contents/{path}"
 
     def call_repository_api(self, 
                 language: str, 
+                size_up_limit : str = "100000", # 100 MB
                 stars: str = ">20", 
                 last_commit_pushed_after: str = "2025-08-18",
                 per_page: int = 100,
@@ -20,6 +21,7 @@ class Github:
         headers = {"Authorization": f"Bearer {self.github_access_token}"}
 
         response = (r.get(url=self.repository_url.format(language=language, 
+                                  size_up_limit=size_up_limit,
                                   stars=stars, 
                                   last_commit_pushed_after=last_commit_pushed_after,
                                   today=datetime.today().strftime('%Y-%m-%d'),
