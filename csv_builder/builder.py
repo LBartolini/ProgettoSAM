@@ -6,7 +6,7 @@ from time import sleep
 
 class Builder:
     def __init__(self, 
-                 language_dict: Mapping[str, List[DependencyFile]],
+                 language_dict: Mapping[str, Mapping[str, DependencyFile]],
                  github: Github,
                  star_ranges: List[str] = ["19..22", "50..65", "150..240", "450..999", ">1800"],
                  output_folder: str = "/output"):
@@ -35,15 +35,16 @@ class Builder:
                     for repo in repositories:
                         if verbose: print(f"Repo {repo['full_name']}")
                         
-                        for dependency_file in self.language_dict[language]:
-                            if verbose: print(f"Searching file {dependency_file.filename}.{dependency_file.extension}")
+                        files_to_search = [v.filename for v in self.language_dict[language].values()]
+                        
+                        files_found = self.github.get_files_from_repo(repo['full_name'], files_to_search=files_to_search)
+                        
+                        for file_searched in files_found.keys():
+                            dependency_set = set()
                             
-                            print(self.github.call_code_api(repo['full_name'], dependency_file.filename, dependency_file.extension, per_page=1))
+                            for url_to_download in files_found[file_searched]:
+                                content = self.language_dict[language][file_searched].download_file(url_to_download)
+                                dependency_set.update(self.language_dict[language][file_searched].extract_dependencies(content))
+                                
+                            print(dependency_set)
                             
-                            total_dependency_file_found = self.github.call_code_api(repo['full_name'], dependency_file.filename, dependency_file.extension, per_page=1)["total_count"]
-                            total_dependency_file_rounds = min(math.ceil(total_dependency_file_found/results_per_page), 10)
-                            
-                            for github_file_index in range(1, total_dependency_file_rounds+1):
-                                self.github.call_code_api(repo['full_name'], dependency_file.filename, dependency_file.extension, page=github_file_index)
-                    
-            

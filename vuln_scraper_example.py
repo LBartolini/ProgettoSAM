@@ -30,6 +30,6 @@ if __name__ == "__main__":
     if (token := os.environ.get("GITHUB_ACCESS_TOKEN")) is None:
         exit("Please set environment variable GITHUB_ACCESS_TOKEN")
     
-    b = Builder({"js": [PackageJson()]}, Github(token))
+    b = Builder({"js": {"package.json": PackageJson()}}, Github(token))
     
     b.build_all_csv(verbose=True)
