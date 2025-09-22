@@ -180,15 +180,16 @@ class Builder:
                                 while self.threads_number >= 10:
                                     if verbose: print("Waiting for threads...")
                                     sleep(3)
-                                
+                                    
                                 thread = threading.Thread(target=self.parse_vuln_and_save, args=(repo,star_range,file_searched,dependency_set.copy()), daemon=True)
+                                with self.mutex:
+                                    self.threads_number+=1
+                                thread.start()
                         except Exception as ex:
                             print("Exception occurred " + str(ex))
                             continue
                         
-                        with self.mutex:
-                            self.threads_number+=1
-                        thread.start()
+                        
 
 
                                 
