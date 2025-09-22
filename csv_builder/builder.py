@@ -9,13 +9,15 @@ from vuln_scraper.deps_dev import DepsDev
 from vuln_scraper.osv_dev import OSDev
 
 import math
+import os 
+import csv
 
 class Builder:
     def __init__(self, 
                  language_dict: Mapping[str, Mapping[str, DependencyFile]],
                  github: Github,
                  star_ranges: List[str] = ["19..22", "50..65", "150..240", "450..999", ">1800"],
-                 output_folder: str = "/output"):
+                 output_folder: str = "./output"):
         self.language_dict = language_dict
         self.github = github
         self.output_folder = output_folder
@@ -26,6 +28,22 @@ class Builder:
         self.os_dev = OSDev()
         
         
+    def flatten_dict(self, d, parent_key='', sep='_'):
+        """
+        Recursively flattens a dictionary, joining nested keys with `sep`.
+        """
+        items = {}
+        for k, v in d.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                items.update(self.flatten_dict(v, new_key, sep=sep))
+            elif isinstance(v, (list, set)):
+                # Convert lists/sets to comma-separated strings
+                items[new_key] = ",".join(map(str, v))
+            else:
+                items[new_key] = v
+        return items
+                
     def build_all_csv(self, results_per_page:int=100, verbose:bool=False):
         if verbose: print("Starting CSV build loop")
         
@@ -33,6 +51,24 @@ class Builder:
             if verbose: print(f"\nStarting with language {language}")
             
             for star_range in self.star_ranges:
+                with open(os.path.join(self.output_folder,star_range+".csv"), "w", newline="", encoding="utf-8") as csvfile:
+                    keys = [
+                            "repository",
+                            "star_range",
+                            "star",
+                            "latest_push",
+                            "files",
+                            "total_dependencies",
+                            "number_of_vulnerabilities",
+                            "ghsa",
+                            "cve_strings",
+                            "cvss",
+                            "severity",
+                            "sploitus_number_of_pocs",
+                    ]
+                    writer = csv.DictWriter(csvfile, fieldnames=keys)
+                    writer.writeheader()
+
                 if verbose: print(f"Star range {star_range}")
                 total_repositories_found = self.github.call_repository_api(language=language, stars=star_range, per_page=1)["total_count"]
                 total_github_repo_rounds = min(math.ceil(total_repositories_found/results_per_page), 10)
@@ -57,49 +93,69 @@ class Builder:
                                 content = self.language_dict[language][file_searched].download_file(url_to_download)
                                 dependency_set.update(self.language_dict[language][file_searched].extract_dependencies(content))
                                 
-                            os_dev_vulns = []
-                            shodan_results = []
-                            sploitus_results = []
-                            deps_result = []
-                            
+                            ghsa = set()
+                            cve_strings = set()
+                            sploitus_pocs = 0
+                            cvss = []
+                            severity = []
+                            print("Analizzando dipendenze... ")
+
+                            # this loop should run in a separate thread
                             for el in dependency_set:
                                 product = el[0]
                                 version = el[1]
                                 
-                                deps_response = self.deps_dev.depsdev_engine(product=product, version=version)
-                                
-                                if 'advisoryKeys' in deps_response and len(deps_response['advisoryKeys']) > 0:
-                                    deps_result = deps_response['advisoryKeys']
-                                
-                                os_dev_engine_response = self.os_dev.osdev_engine(product=product, version=version)
-                                
-                                if len(os_dev_engine_response) > 0:
-                                    for vuln in os_dev_engine_response['vulns']:
-                                        os_dev_vulns.append({'id':vuln['id'], 'refs':vuln['references'], "score": vuln['severity'][0]['score']})
-                                                                
-                                s_r = self.shodan.shodan_engine(product=product,version=version)
-    
-                                if s_r is not None:
-                                    shodan_results.append(s_r)
-                                    for result in s_r: # result is in the format product:version:cve of vulnerables found
-                                        cve = result.split(":")[-1] # get cve only
-                                        sploitus , ll = self.sploitus.search_sploitus_by_cve(cve=cve)
-                                        if ll > 0:
-                                            sploitus_results.append(sploitus)
-                                        
+                                try:
+                                    #deps_response = self.deps_dev.depsdev_engine(product=product, version=version)
+                                    
+                                    #if 'advisoryKeys' in deps_response and len(deps_response['advisoryKeys']) > 0:
+                                        #ghsa.update(set([x['id'] for x in deps_response['advisoryKeys']]))
+                                             
+                                    os_dev_engine_response = self.os_dev.osdev_engine(product=product, version=version)
+                                    
+                                    if len(os_dev_engine_response) > 0:
+                                        for vuln in os_dev_engine_response['vulns']:
+                                            alieases = vuln['aliases'] if 'aliases' in vuln else []
+                                            ss = vuln['database_specific']['severity'] if 'database_specific' in vuln and 'severity' in vuln['database_specific'] else 'UNKNOWN'
+                                            cve_strings.update(set(alieases))
+                                            severity.append(ss)      
+                                                                    
+                                    s_r = self.shodan.shodan_engine(product=product,version=version)
+        
+                                    if s_r is not None:
+                                        for result in s_r:
+                                            cve_strings.add(result['cve_id']) 
+                                            cvss.append(result['cvss'])
+                                            
+                                except ValueError:
+                                    pass
+                            
+                            for cve in cve_strings:
+                                if cve.startswith("CVE"): # let's consider cve only
+                                    _ , ll = self.sploitus.search_sploitus_by_cve(cve=cve)
+                                    sploitus_pocs = sploitus_pocs + ll
+
                             # export in csv
                             csv_output = {
                                           "repository" : repo['full_name'], 
                                           "star_range": star_range,
+                                          "star": repo['stargazers_count'],
                                           "latest_push": repo['updated_at'],
-                                          "files": files_found, 
-                                          "total_dependencies": dependency_set,
-                                          "number of vulnerabilities": (a if (a := max([deps_result, os_dev_vulns, shodan_results], key=len)) else 0),
-                                          "deps_result": deps_result,
-                                          "os_dev_vulns": os_dev_vulns,
-                                          "shodan_result": shodan_results,
-                                          "sploitus_result": sploitus_results,
+                                          "files": file_searched, 
+                                          "total_dependencies": len(dependency_set),
+                                          "number_of_vulnerabilities":  max(len(cve_strings), len(ghsa), 0),
+                                          "ghsa": ghsa,
+                                          "cve_strings" : cve_strings,
+                                          "cvss": cvss,
+                                          "severity": severity,
+                                          "sploitus_number_of_pocs": sploitus_pocs
                             }
                             
                             
-                            print(csv_output)
+                            # Flatten the dictionary
+                            flat_output = self.flatten_dict(csv_output)
+
+                            # Write to CSV
+                            with open(os.path.join(self.output_folder,star_range+".csv"), "a", newline="", encoding="utf-8") as csvfile:
+                                writer = csv.DictWriter(csvfile, fieldnames=flat_output.keys())
+                                writer.writerow(flat_output)
