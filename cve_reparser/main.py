@@ -119,6 +119,9 @@ vulns = [
     'improper input sanitization',
     'improper sanitization',
     'insufficient input validation',
+    'insufficient validation',
+    'insufficient sanitization',
+    'sanitization',
 
     # Misc
     'insecure randomness',
